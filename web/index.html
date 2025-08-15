@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="location">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>location</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Define service worker version for Flutter -->
+  <script>
+    // This will be replaced by Flutter's build process
+    var serviceWorkerVersion = null;
+  </script>
+</head>
+<body>
+  <!-- Google Maps JavaScript API with optimized loading -->
+  <script>
+    const GOOGLE_MAPS_CONFIG = {
+      apiKey: 'AIzaSyCeUvUpxCAYciJZ4blCtMm7snAM8ODvmg4',
+      libraries: ['geometry', 'places'],
+      version: 'weekly',
+      region: 'US',
+      language: 'en'
+    };
+
+    window.initMap = function() {
+      console.log('Google Maps API loaded successfully');
+      window.flutter_injected = window.flutter_injected || {};
+      window.flutter_injected.googleMapsLoaded = true;
+      window.dispatchEvent(new CustomEvent('google-maps-loaded', {
+        detail: { mapsApi: window.google.maps }
+      }));
+    };
+
+    class GoogleMapsLoader {
+      constructor() {
+        this.isLoading = false;
+        this.isLoaded = false;
+        this.loadPromise = null;
+      }
+      load() {
+        if (this.loadPromise) return this.loadPromise;
+        if (this.isLoaded || (window.google && window.google.maps)) {
+          this.isLoaded = true;
+          return Promise.resolve();
+        }
+        this.loadPromise = new Promise((resolve, reject) => {
+          this.isLoading = true;
+          const params = new URLSearchParams({
+            key: GOOGLE_MAPS_CONFIG.apiKey,
+            loading: 'async',
+            callback: 'initMap',
+            v: GOOGLE_MAPS_CONFIG.version,
+            region: GOOGLE_MAPS_CONFIG.region,
+            language: GOOGLE_MAPS_CONFIG.language
+          });
+          if (GOOGLE_MAPS_CONFIG.libraries.length > 0) {
+            params.append('libraries', GOOGLE_MAPS_CONFIG.libraries.join(','));
+          }
+          const script = document.createElement('script');
+          script.src = `https://maps.googleapis.com/maps/api/js?${params}`;
+          script.async = true;
+          script.defer = true;
+          script.type = 'text/javascript';
+          const nonce = document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content');
+          if (nonce) script.nonce = nonce;
+          script.onload = () => {
+            console.log('Google Maps script loaded successfully');
+            this.isLoaded = true;
+            this.isLoading = false;
+            resolve();
+          };
+          script.onerror = (error) => {
+            console.error('Failed to load Google Maps API:', error);
+            this.isLoading = false;
+            reject(new Error('Failed to load Google Maps API'));
+          };
+          const timeout = setTimeout(() => {
+            console.error('Google Maps API loading timeout');
+            this.isLoading = false;
+            reject(new Error('Google Maps API loading timeout'));
+          }, 10000);
+          script.addEventListener('load', () => clearTimeout(timeout));
+          document.head.appendChild(script);
+        });
+        return this.loadPromise;
+      }
+      isReady() {
+        return this.isLoaded && window.google && window.google.maps;
+      }
+    }
+    window.googleMapsLoader = new GoogleMapsLoader();
+
+    document.addEventListener('DOMContentLoaded', function() {
+      window.googleMapsLoader.load()
+        .then(() => console.log('Google Maps API ready for use'))
+        .catch((error) => console.error('Error loading Google Maps API:', error));
+    });
+
+    window.addEventListener('flutter-first-frame', function() {
+      if (!window.googleMapsLoader.isReady()) {
+        window.googleMapsLoader.load();
+      }
+    });
+  </script>
+
+  <!-- Flutter initialization -->
+  <script src="flutter.js" defer></script>
+  
+  <script>
+    window.addEventListener('load', function(ev) {
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        },
+        onEntrypointLoaded: function(engineInitializer) {
+          engineInitializer.initializeEngine().then(function(appRunner) {
+            Promise.resolve().then(() => {
+              if (!window.google || !window.google.maps) {
+                return window.googleMapsLoader.load();
+              }
+            }).then(() => {
+              appRunner.runApp();
+              window.dispatchEvent(new CustomEvent('flutter-initialized'));
+            }).catch((error) => {
+              console.error('Error initializing app:', error);
+              appRunner.runApp();
+            });
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
